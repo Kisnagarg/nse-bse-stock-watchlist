@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Stock Organizer - TradingView Watchlist Manager",
+  "short_name": "Stock Organizer",
+  "version": "1.0.0",
+  "description": "Quickly detect Indian stocks (NSE & BSE) on TradingView and organize them across your custom watchlists and sections.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Stock Organizer"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.tradingview.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.tradingview.com/*",
+    "http://localhost:3000/*",
+    "https://*.vercel.app/*"
+  ]
+}

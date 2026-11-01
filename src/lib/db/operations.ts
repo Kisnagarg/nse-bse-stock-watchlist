@@ -915,3 +915,152 @@ export function getStockUniverseStats() {
   };
 }
 
+// ─── Extension Specific Operations ─────────────────────────────────────
+
+export function getStockStatusAndWatchlists(symbolOrListingId: string | number) {
+  let listingId: number | null = null;
+
+  if (typeof symbolOrListingId === 'number') {
+    listingId = symbolOrListingId;
+  } else if (!isNaN(Number(symbolOrListingId)) && !symbolOrListingId.includes(':')) {
+    // Might be listingId or BSE numeric code
+    const byId = rawDb.prepare('SELECT id FROM exchange_listings WHERE id = ?').get(Number(symbolOrListingId)) as { id: number } | undefined;
+    if (byId) {
+      listingId = byId.id;
+    } else {
+      const validated = parseAndValidateSymbols(symbolOrListingId);
+      if (validated[0]?.listingId) listingId = validated[0].listingId;
+    }
+  } else {
+    const validated = parseAndValidateSymbols(String(symbolOrListingId));
+    if (validated[0]?.listingId) listingId = validated[0].listingId;
+  }
+
+  if (!listingId) return null;
+
+  // Fetch listing and company
+  const listingData = rawDb.prepare(`
+    SELECT 
+      el.id as listing_id,
+      el.exchange,
+      el.trading_symbol,
+      el.security_code,
+      el.tradingview_symbol,
+      el.listing_status,
+      c.id as company_id,
+      c.company_name,
+      c.isin,
+      s.name as sector_name,
+      ss.name as subsector_name
+    FROM exchange_listings el
+    INNER JOIN companies c ON c.id = el.company_id
+    LEFT JOIN sectors s ON s.id = c.sector_id
+    LEFT JOIN subsectors ss ON ss.id = c.subsector_id
+    WHERE el.id = ?
+  `).get(listingId) as {
+    listing_id: number;
+    exchange: string;
+    trading_symbol: string;
+    security_code: string | null;
+    tradingview_symbol: string;
+    listing_status: string;
+    company_id: number;
+    company_name: string;
+    isin: string | null;
+    sector_name: string | null;
+    subsector_name: string | null;
+  } | undefined;
+
+  if (!listingData) return null;
+
+  // Fetch all watchlists and sections
+  const allWatchlists = getAllWatchlists();
+
+  // Fetch this listing's current memberships across all watchlists
+  const memberships = rawDb.prepare(`
+    SELECT 
+      ws.watchlist_id,
+      ws.section_id,
+      sec.name as section_name
+    FROM watchlist_stocks ws
+    LEFT JOIN sections sec ON sec.id = ws.section_id
+    WHERE ws.exchange_listing_id = ?
+  `).all(listingId) as Array<{
+    watchlist_id: number;
+    section_id: number | null;
+    section_name: string | null;
+  }>;
+
+  const membershipMap = new Map<number, { sectionId: number | null; sectionName: string | null }>();
+  for (const m of memberships) {
+    membershipMap.set(m.watchlist_id, {
+      sectionId: m.section_id,
+      sectionName: m.section_name,
+    });
+  }
+
+  const watchlistsWithStatus = allWatchlists.map(wl => {
+    const membership = membershipMap.get(wl.id);
+    return {
+      id: wl.id,
+      name: wl.name,
+      color: wl.color,
+      sortOrder: wl.sortOrder,
+      stockCount: wl.stockCount,
+      sections: wl.sections || [],
+      isMember: !!membership,
+      currentSectionId: membership ? membership.sectionId : null,
+      currentSectionName: membership ? membership.sectionName : null,
+    };
+  });
+
+  return {
+    stock: {
+      listingId: listingData.listing_id,
+      companyId: listingData.company_id,
+      exchange: listingData.exchange,
+      tradingSymbol: listingData.trading_symbol,
+      securityCode: listingData.security_code,
+      tradingviewSymbol: listingData.tradingview_symbol,
+      companyName: listingData.company_name,
+      isin: listingData.isin,
+      sectorName: listingData.sector_name,
+      subsectorName: listingData.subsector_name,
+      listingStatus: listingData.listing_status,
+    },
+    watchlists: watchlistsWithStatus,
+  };
+}
+
+export function assignStockToSection(watchlistId: number, exchangeListingId: number, sectionId: number | null) {
+  // If stock is not in watchlist, insert it. If already in watchlist, update sectionId.
+  const existing = rawDb.prepare(`
+    SELECT id FROM watchlist_stocks WHERE watchlist_id = ? AND exchange_listing_id = ?
+  `).get(watchlistId, exchangeListingId) as { id: number } | undefined;
+
+  if (existing) {
+    rawDb.prepare(`
+      UPDATE watchlist_stocks SET section_id = ? WHERE id = ?
+    `).run(sectionId, existing.id);
+  } else {
+    const maxOrder = rawDb.prepare(`
+      SELECT COALESCE(MAX(sort_order), -1) + 1 as next FROM watchlist_stocks WHERE watchlist_id = ?
+    `).get(watchlistId) as { next: number };
+
+    rawDb.prepare(`
+      INSERT INTO watchlist_stocks (watchlist_id, section_id, exchange_listing_id, sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run(watchlistId, sectionId, exchangeListingId, maxOrder.next);
+  }
+
+  return { success: true };
+}
+
+export function removeStockFromAllWatchlists(exchangeListingId: number) {
+  const result = rawDb.prepare(`
+    DELETE FROM watchlist_stocks WHERE exchange_listing_id = ?
+  `).run(exchangeListingId);
+
+  return { success: true, removedCount: result.changes };
+}
+

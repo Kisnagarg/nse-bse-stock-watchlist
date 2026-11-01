@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Organizer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="extension-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="app-logo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+            <polyline points="16 7 22 7 22 13"></polyline>
+          </svg>
+        </div>
+        <div class="header-title-box">
+          <span class="app-title">Stock Organizer</span>
+          <span class="status-indicator online" id="connectionDot" title="Backend connected"></span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" id="btnRefresh" title="Refresh detected stock">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btnToggleSearch" title="Search stocks manually">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btnSettings" title="API Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Settings Drawer (Hidden by default) -->
+    <div class="settings-drawer hidden" id="settingsDrawer">
+      <div class="settings-header">
+        <span class="settings-title">Backend Connection</span>
+        <button class="close-btn" id="btnCloseSettings">&times;</button>
+      </div>
+      <div class="settings-body">
+        <label for="apiUrlInput">API Base URL</label>
+        <div class="url-input-wrap">
+          <input type="text" id="apiUrlInput" placeholder="https://watchlist-app-sable.vercel.app" spellcheck="false">
+        </div>
+        <div class="url-presets">
+          <button class="preset-pill" data-url="https://watchlist-app-sable.vercel.app">Vercel (Prod)</button>
+          <button class="preset-pill" data-url="http://localhost:3000">Local (3000)</button>
+        </div>
+        <div class="settings-actions">
+          <button class="secondary-btn" id="btnTestConn">Test Ping</button>
+          <button class="primary-btn" id="btnSaveSettings">Save</button>
+        </div>
+        <div class="connection-status-msg" id="connStatusMsg"></div>
+      </div>
+    </div>
+
+    <!-- Manual Search Box (Collapsible) -->
+    <div class="search-box-wrap hidden" id="searchBoxWrap">
+      <div class="search-input-inner">
+        <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="stockSearchInput" placeholder="Search NSE/BSE symbol or company..." autocomplete="off" spellcheck="false">
+        <button class="clear-search-btn hidden" id="btnClearSearch">&times;</button>
+      </div>
+      <div class="search-dropdown hidden" id="searchDropdown"></div>
+    </div>
+
+    <!-- Active Stock Card -->
+    <section class="active-stock-section" id="activeStockSection">
+      <div class="stock-header-row">
+        <div class="stock-symbol-group">
+          <span class="exchange-badge nse" id="stockExchange">NSE</span>
+          <span class="stock-symbol" id="stockSymbol">DETECTING...</span>
+        </div>
+        <span class="isin-tag" id="stockIsin"></span>
+      </div>
+      <div class="stock-name" id="stockName">Checking active TradingView tab...</div>
+      <div class="stock-meta-row">
+        <span class="sector-tag" id="stockSector">Sector: —</span>
+        <span class="subsector-tag" id="stockSubsector">Subsector: —</span>
+      </div>
+    </section>
+
+    <!-- Not Found / Non-TV Banner (Hidden by default) -->
+    <div class="status-banner hidden" id="statusBanner">
+      <div class="banner-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="banner-text" id="statusBannerText">
+        No active TradingView chart detected. Use the search bar above to look up any stock.
+      </div>
+    </div>
+
+    <!-- Watchlist Membership List Section -->
+    <section class="watchlists-section">
+      <div class="watchlists-header">
+        <span class="watchlists-title">WATCHLISTS</span>
+        <span class="watchlists-count-badge" id="watchlistsSummary">0 / 0</span>
+      </div>
+
+      <!-- Watchlists scrollable list -->
+      <div class="watchlists-list" id="watchlistsList">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Loading watchlists...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Actions / Footer -->
+    <footer class="app-footer">
+      <button class="danger-outline-btn" id="btnRemoveAll" title="Remove this stock from all watchlists">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+        <span>Remove from All</span>
+      </button>
+
+      <button class="open-web-btn" id="btnOpenWeb" title="Open full web application">
+        <span>Open Web App</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+      </button>
+    </footer>
+
+    <!-- Toast Notification Banner -->
+    <div class="toast-notification hidden" id="toastNotification">
+      <span class="toast-message" id="toastMessage">Done</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
