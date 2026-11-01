@@ -1616,7 +1616,23 @@
         isin: rawStock.isin || ''
       };
 
-      currentWatchlists = (data.watchlists || []).map(w => ({
+      let rawWl = Array.isArray(data.watchlists) ? data.watchlists : [];
+      if (rawWl.length === 0) {
+        try {
+          const wlRes = await fetch(`${apiBaseUrl}/api/watchlists`);
+          if (wlRes.ok) {
+            const wlData = await wlRes.json();
+            const fetched = Array.isArray(wlData) ? wlData : (wlData.watchlists || []);
+            rawWl = fetched.map(w => ({
+              ...w,
+              isMember: false,
+              currentSection: null
+            }));
+          }
+        } catch (e) {}
+      }
+
+      currentWatchlists = rawWl.map(w => ({
         ...w,
         totalStocks: w.stockCount !== undefined ? w.stockCount : (w.totalStocks || 0),
         currentSection: w.currentSection || (w.currentSectionId ? { id: w.currentSectionId, name: w.currentSectionName } : null),
@@ -1718,11 +1734,15 @@
       const res = await fetch(`${apiBaseUrl}/api/watchlists`);
       if (res.ok) {
         const data = await res.json();
-        currentWatchlists = (data.watchlists || []).map(w => ({
+        // If a stock was loaded while this request was inflight, do NOT overwrite with empty list!
+        if (currentStock) return;
+        const rawList = Array.isArray(data) ? data : (data.watchlists || []);
+        currentWatchlists = rawList.map(w => ({
           ...w,
+          totalStocks: w.stockCount !== undefined ? w.stockCount : (w.totalStocks || 0),
           isMember: false,
           currentSection: null,
-          sections: []
+          sections: w.sections || []
         }));
         const countPill = shadowRoot.getElementById('so-wl-summary');
         if (countPill) countPill.textContent = `0 / ${currentWatchlists.length}`;
@@ -1738,7 +1758,23 @@
     if (!bodyEl) return;
 
     if (!currentWatchlists || currentWatchlists.length === 0) {
-      bodyEl.innerHTML = '<div class="so-loading"><span>No watchlists found</span></div>';
+      bodyEl.innerHTML = `
+        <div class="so-loading" style="padding: 24px 14px; text-align: center;">
+          <span style="color: #787b86; font-size: 11.5px; margin-bottom: 8px;">No watchlists found in database</span>
+          <div style="display: flex; gap: 6px; width: 100%; max-width: 280px; margin-top: 8px;">
+            <input type="text" id="so-quick-create-input" placeholder="Create watchlist (e.g. Leading)..." style="flex: 1; background: #131722; border: 1px solid #2a2e39; border-radius: 4px; padding: 5px 8px; color: #fff; font-size: 11px; outline: none;">
+            <button id="so-quick-create-btn" style="background: #2962ff; color: #fff; border: none; border-radius: 4px; padding: 0 10px; font-size: 11px; font-weight: 600; cursor: pointer;">+ Create</button>
+          </div>
+        </div>
+      `;
+      const btnQ = shadowRoot.getElementById('so-quick-create-btn');
+      const inpQ = shadowRoot.getElementById('so-quick-create-input');
+      if (btnQ && inpQ) {
+        btnQ.addEventListener('click', () => {
+          const name = inpQ.value.trim();
+          if (name) handleCreateWatchlist(name);
+        });
+      }
       return;
     }
 
@@ -1876,6 +1912,53 @@
 
       bodyEl.appendChild(card);
     });
+
+    // Append inline "+ New Watchlist" row at the bottom of the list
+    const addWlRow = document.createElement('div');
+    addWlRow.className = 'so-add-wl-footer-row';
+    addWlRow.style.cssText = 'display: flex; gap: 6px; padding: 8px 12px; background: #131722; border-top: 1px dashed #2a2e39;';
+    addWlRow.innerHTML = `
+      <input type="text" id="so-input-new-wl" placeholder="+ New watchlist..." style="flex: 1; background: #181c27; border: 1px solid #2a2e39; border-radius: 4px; padding: 4px 7px; color: #fff; font-size: 11px; outline: none;">
+      <button id="so-btn-new-wl" style="background: #2a2e39; color: #d1d4dc; border: none; border-radius: 4px; padding: 0 10px; font-size: 10px; font-weight: 600; cursor: pointer;">Add</button>
+    `;
+    const btnNewWl = addWlRow.querySelector('#so-btn-new-wl');
+    const inpNewWl = addWlRow.querySelector('#so-input-new-wl');
+    if (btnNewWl && inpNewWl) {
+      btnNewWl.addEventListener('click', () => {
+        const name = inpNewWl.value.trim();
+        if (name) handleCreateWatchlist(name);
+      });
+      inpNewWl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const name = inpNewWl.value.trim();
+          if (name) handleCreateWatchlist(name);
+        }
+      });
+    }
+    bodyEl.appendChild(addWlRow);
+  }
+
+  async function handleCreateWatchlist(name) {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/watchlists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color: '#2962ff' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create watchlist');
+
+      showToast(`Created "${name}"`);
+      if (currentStock && currentStock.id && data.id) {
+        await assignStockSection(data.id, null);
+      } else if (currentStock && currentStock.tvSymbol) {
+        loadStockStatus(currentStock.tvSymbol);
+      } else {
+        triggerStockDetection();
+      }
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+    }
   }
 
   // --- ACTIONS (Assign, Remove, Create) ---

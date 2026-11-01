@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server';
-import { ensureDb, jsonResponse, errorResponse, getSearchParams } from '@/app/api/_helpers';
+import { ensureDb, jsonResponse, errorResponse, handleOptions, getSearchParams } from '@/app/api/_helpers';
 import * as ops from '@/lib/db/operations';
+
+export async function OPTIONS() {
+  return handleOptions();
+}
 
 export async function GET(req: NextRequest) {
   ensureDb();

@@ -331,7 +331,23 @@ async function fetchStockStatus(symbolQuery) {
       isin: rawStock.isin || ''
     };
 
-    currentWatchlists = (data.watchlists || []).map(w => ({
+    let rawWl = Array.isArray(data.watchlists) ? data.watchlists : [];
+    if (rawWl.length === 0) {
+      try {
+        const wlRes = await fetch(`${apiBaseUrl}/api/watchlists`);
+        if (wlRes.ok) {
+          const wlData = await wlRes.json();
+          const fetched = Array.isArray(wlData) ? wlData : (wlData.watchlists || []);
+          rawWl = fetched.map(w => ({
+            ...w,
+            isMember: false,
+            currentSection: null
+          }));
+        }
+      } catch (e) {}
+    }
+
+    currentWatchlists = rawWl.map(w => ({
       ...w,
       totalStocks: w.stockCount !== undefined ? w.stockCount : (w.totalStocks || 0),
       currentSection: w.currentSection || (w.currentSectionId ? { id: w.currentSectionId, name: w.currentSectionName } : null),
@@ -376,11 +392,14 @@ async function loadEmptyWatchlistsList() {
     const res = await fetch(`${apiBaseUrl}/api/watchlists`);
     if (res.ok) {
       const data = await res.json();
-      currentWatchlists = (data.watchlists || []).map(w => ({
+      if (currentStock && currentWatchlists.length > 0) return;
+      const rawList = Array.isArray(data) ? data : (data.watchlists || []);
+      currentWatchlists = rawList.map(w => ({
         ...w,
+        totalStocks: w.stockCount !== undefined ? w.stockCount : (w.totalStocks || 0),
         isMember: false,
         currentSection: null,
-        sections: []
+        sections: w.sections || []
       }));
       watchlistsSummary.textContent = `0 / ${currentWatchlists.length}`;
       renderWatchlistsList();
