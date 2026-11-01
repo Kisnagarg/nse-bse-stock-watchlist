@@ -303,8 +303,27 @@ async function fetchStockStatus(symbolQuery) {
     const data = await res.json();
     setConnectionStatus(true);
 
-    currentStock = data.stock;
-    currentWatchlists = data.watchlists || [];
+    const rawStock = data.stock;
+    currentStock = {
+      id: rawStock.listingId || rawStock.id,
+      symbol: rawStock.tradingSymbol || rawStock.symbol,
+      tvSymbol: rawStock.tradingviewSymbol || rawStock.tvSymbol || rawStock.tradingSymbol || rawStock.symbol,
+      name: rawStock.companyName || rawStock.name || rawStock.tradingSymbol,
+      exchange: rawStock.exchange || 'NSE',
+      sector: rawStock.sectorName || rawStock.sector || 'Unclassified',
+      subsector: rawStock.subsectorName || rawStock.subsector || '—',
+      isin: rawStock.isin || ''
+    };
+
+    currentWatchlists = (data.watchlists || []).map(w => ({
+      ...w,
+      totalStocks: w.stockCount !== undefined ? w.stockCount : (w.totalStocks || 0),
+      currentSection: w.currentSection || (w.currentSectionId ? { id: w.currentSectionId, name: w.currentSectionName } : null),
+      sections: (w.sections || []).map(sec => ({
+        ...sec,
+        stockCount: sec.stockCount !== undefined ? sec.stockCount : 0
+      }))
+    }));
 
     // Render Stock Details Card
     stockExchange.textContent = currentStock.exchange;
@@ -312,8 +331,8 @@ async function fetchStockStatus(symbolQuery) {
     stockSymbol.textContent = currentStock.tvSymbol || currentStock.symbol;
     stockIsin.textContent = currentStock.isin || '';
     stockName.textContent = currentStock.name || currentStock.symbol;
-    stockSector.textContent = `Sector: ${currentStock.sector || 'Unclassified'}`;
-    stockSubsector.textContent = `Subsector: ${currentStock.subsector || '—'}`;
+    stockSector.textContent = `Sector: ${currentStock.sector}`;
+    stockSubsector.textContent = `Subsector: ${currentStock.subsector}`;
 
     // Summary badge
     const memberCount = currentWatchlists.filter(w => w.isMember).length;
@@ -521,8 +540,11 @@ async function handleAddStockToWatchlist(watchlistId, sectionId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'assign_section',
+        watchlistId: watchlistId,
         watchlist_id: watchlistId,
+        listingId: currentStock.id,
         stock_id: currentStock.id,
+        sectionId: sectionId,
         section_id: sectionId
       })
     });
@@ -551,8 +573,11 @@ async function handleAssignSection(watchlistId, sectionId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'assign_section',
+        watchlistId: watchlistId,
         watchlist_id: watchlistId,
+        listingId: currentStock.id,
         stock_id: currentStock.id,
+        sectionId: sectionId,
         section_id: sectionId
       })
     });
@@ -582,8 +607,10 @@ async function handleCreateSectionAndAssign(watchlistId, sectionName) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'create_section',
+        watchlistId: watchlistId,
         watchlist_id: watchlistId,
-        name: sectionName
+        name: sectionName,
+        sectionName: sectionName
       })
     });
 
@@ -611,7 +638,9 @@ async function handleRemoveFromWatchlist(watchlistId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'remove_watchlist',
+        watchlistId: watchlistId,
         watchlist_id: watchlistId,
+        listingId: currentStock.id,
         stock_id: currentStock.id
       })
     });

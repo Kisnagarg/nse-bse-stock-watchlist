@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   ensureDb();
   const body = await req.json();
-  const { action, watchlistId, listingId, sectionId, sectionName } = body;
+  const action = body.action;
+  const watchlistId = body.watchlistId || body.watchlist_id;
+  const listingId = body.listingId || body.stock_id || body.stockId;
+  const sectionId = body.sectionId !== undefined ? body.sectionId : body.section_id;
+  const sectionName = body.sectionName || body.name;
 
   if (!listingId && action !== 'create_section') {
     return errorResponse('listingId is required');
