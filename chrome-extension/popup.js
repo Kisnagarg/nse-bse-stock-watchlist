@@ -65,6 +65,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupEventListeners() {
+  const btnFocusFloating = document.getElementById('btnFocusFloating');
+  if (btnFocusFloating) {
+    btnFocusFloating.addEventListener('click', async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab && tab.id) {
+          await chrome.tabs.sendMessage(tab.id, { action: 'SHOW_FLOATING_WIDGET' });
+          showToast('Floating widget active on chart');
+          setTimeout(() => window.close(), 500);
+        }
+      } catch (e) {
+        showToast('Open TradingView to use floating widget');
+      }
+    });
+  }
+
   btnRefresh.addEventListener('click', () => {
     btnRefresh.classList.add('spinning');
     initDetection().finally(() => {

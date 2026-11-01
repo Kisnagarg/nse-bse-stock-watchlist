@@ -13,6 +13,20 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
+// Hotkey command listener
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'toggle-widget') {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.id) {
+        chrome.tabs.sendMessage(tab.id, { action: 'TOGGLE_FLOATING_WIDGET' });
+      }
+    } catch (e) {
+      console.warn('Could not toggle widget via command:', e);
+    }
+  }
+});
+
 // Relay helper: query active tab's TradingView symbol
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'DETECT_ACTIVE_TAB_SYMBOL') {
@@ -58,3 +72,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 });
+

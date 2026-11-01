@@ -37,9 +37,19 @@
     "storage",
     "tabs"
   ],
+  "commands": {
+    "toggle-widget": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Toggle Stock Organizer Floating Widget on TradingView"
+    }
+  },
   "host_permissions": [
     "*://*.tradingview.com/*",
     "http://localhost:3000/*",
     "https://*.vercel.app/*"
   ]
 }
+
