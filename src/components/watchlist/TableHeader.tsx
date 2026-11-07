@@ -117,7 +117,7 @@ export function TableHeader({
       )}
 
       {/* 9. Actions */}
-      <div className="w-8 shrink-0" />
+      <div className="w-14 shrink-0" />
     </div>
   );
 }

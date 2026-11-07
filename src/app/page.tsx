@@ -448,12 +448,14 @@ export default function App() {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          watchlistId: activeWatchlistId,
-          exchangeListingId: stock.exchange_listing_id,
+          watchlistId: Number(activeWatchlistId),
+          exchangeListingId: Number(stock.exchange_listing_id),
+          stockId: Number(stock.id),
         }),
       });
 
       refreshWatchlists();
+      refreshStocks();
 
       addToast({
         type: 'info',
@@ -480,35 +482,59 @@ export default function App() {
 
   const handleBulkDelete = async () => {
     if (!activeWatchlistId || selectedStockIds.length === 0) return;
-    if (
-      !confirm(
-        `Remove ${selectedStockIds.length} selected stocks from "${activeWatchlist?.name}"?`
-      )
-    ) {
-      return;
-    }
+    const toRemoveCount = selectedStockIds.length;
+    const toRemoveIds = [...selectedStockIds];
 
-    const stocksToRemove = stocks.filter((s) => selectedStockIds.includes(s.id));
-    setStocks((prev) => prev.filter((s) => !selectedStockIds.includes(s.id)));
+    setStocks((prev) => prev.filter((s) => !toRemoveIds.includes(s.id)));
     setSelectedStockIds([]);
 
-    for (const s of stocksToRemove) {
+    try {
       await fetch('/api/stocks', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          watchlistId: activeWatchlistId,
-          exchangeListingId: s.exchange_listing_id,
+          watchlistId: Number(activeWatchlistId),
+          stockIds: toRemoveIds,
         }),
       });
-    }
 
-    refreshWatchlists();
-    addToast({
-      type: 'info',
-      message: `Removed ${stocksToRemove.length} stocks from watchlist`,
-    });
+      refreshWatchlists();
+      refreshStocks();
+
+      addToast({
+        type: 'info',
+        message: `Removed ${toRemoveCount} stocks from watchlist`,
+      });
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      refreshStocks();
+    }
   };
+
+  // Global Keyboard Shortcuts (Delete/Backspace to remove selected stocks)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable)
+        ) {
+          return;
+        }
+
+        if (selectedStockIds.length > 0 && activeWatchlistId) {
+          e.preventDefault();
+          handleBulkDelete();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedStockIds, activeWatchlistId, stocks]);
 
   const handleOpenMoveSingle = (stock: StockRowItem) => {
     setTargetStockIds([stock.id]);
@@ -878,6 +904,7 @@ export default function App() {
         watchlist={editingWatchlist}
         onClose={() => setManageWatchlistModalOpen(false)}
         onSave={handleSaveWatchlist}
+        onDelete={handleDeleteWatchlist}
       />
 
       {/* Move / Copy Modal */}

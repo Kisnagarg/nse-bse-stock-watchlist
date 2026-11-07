@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Trash2 } from 'lucide-react';
 import type { Watchlist } from '@/lib/types';
 
 interface ManageWatchlistModalProps {
@@ -9,6 +9,7 @@ interface ManageWatchlistModalProps {
   watchlist?: Watchlist | null; // if null, creating new
   onClose: () => void;
   onSave: (name: string, color: string) => void;
+  onDelete?: (id: number) => void;
 }
 
 const PRESET_COLORS = [
@@ -27,6 +28,7 @@ export function ManageWatchlistModal({
   watchlist,
   onClose,
   onSave,
+  onDelete,
 }: ManageWatchlistModalProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#2962ff');
@@ -101,21 +103,44 @@ export function ManageWatchlistModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#2a2e39]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-[#787b86] hover:text-[#d1d4dc] transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className="px-4 py-2 text-xs font-semibold bg-[#2962ff] hover:bg-[#1e53e5] disabled:opacity-50 text-white rounded-lg transition shadow-md"
-            >
-              {watchlist ? 'Save Changes' : 'Create Watchlist'}
-            </button>
+          <div className="flex items-center justify-between pt-3 border-t border-[#2a2e39]">
+            {watchlist && onDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    confirm(
+                      `Delete watchlist "${watchlist.name}"? Stocks will not be removed from the database.`
+                    )
+                  ) {
+                    onDelete(watchlist.id);
+                    onClose();
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#f23645] hover:bg-[#f23645]/15 rounded-lg transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Watchlist</span>
+              </button>
+            ) : (
+              <div />
+            )}
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-medium text-[#787b86] hover:text-[#d1d4dc] transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!name.trim()}
+                className="px-4 py-2 text-xs font-semibold bg-[#2962ff] hover:bg-[#1e53e5] disabled:opacity-50 text-white rounded-lg transition shadow-md"
+              >
+                {watchlist ? 'Save Changes' : 'Create Watchlist'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

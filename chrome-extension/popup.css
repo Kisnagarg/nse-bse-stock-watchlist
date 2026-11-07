@@ -668,6 +668,25 @@ body {
   color: var(--color-green);
 }
 
+.row-remove-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.row-remove-btn:hover {
+  background: rgba(242, 54, 69, 0.15);
+  color: var(--color-red);
+  border-color: rgba(242, 54, 69, 0.3);
+}
+
 .add-btn {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);

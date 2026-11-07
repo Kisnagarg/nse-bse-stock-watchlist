@@ -192,8 +192,20 @@ export function StockRow({
         </div>
       )}
 
-      {/* 9. Action Menu (3-dots) */}
-      <div className="w-8 shrink-0 relative flex justify-end">
+      {/* 9. Direct Delete & Action Menu */}
+      <div className="w-14 shrink-0 relative flex items-center justify-end">
+        {/* Direct 1-Click Delete Button (visible on row hover) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteStock(stock);
+          }}
+          title="Remove from watchlist"
+          className="p-1 text-[#787b86] hover:text-[#f23645] hover:bg-[#f23645]/15 rounded opacity-0 group-hover:opacity-100 transition mr-0.5"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -206,75 +218,85 @@ export function StockRow({
 
         {/* Dropdown / Context Menu */}
         {menuOpen && (
-          <div
-            className="fixed z-50 w-52 bg-[#1e222d] border border-[#2a2e39] rounded-md shadow-2xl py-1 text-xs"
-            style={
-              contextMenuPos
-                ? { left: contextMenuPos.x, top: contextMenuPos.y }
-                : { right: '2rem', top: 'auto' }
-            }
-            onClick={(e) => e.stopPropagation()}
-            onMouseLeave={() => setMenuOpen(false)}
-          >
-            <button
-              onClick={() => {
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={(e) => {
+                e.stopPropagation();
                 setMenuOpen(false);
-                window.open(tvUrl, '_blank');
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
+            />
+            <div
+              className={`${
+                contextMenuPos ? 'fixed' : 'absolute right-0 top-8'
+              } z-50 w-52 bg-[#1e222d] border border-[#2a2e39] rounded-md shadow-2xl py-1 text-xs`}
+              style={
+                contextMenuPos
+                  ? { left: contextMenuPos.x, top: contextMenuPos.y }
+                  : undefined
+              }
+              onClick={(e) => e.stopPropagation()}
             >
-              <ExternalLink className="w-3.5 h-3.5 text-[#2962ff]" />
-              <span>Open TradingView Chart</span>
-            </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  window.open(tvUrl, '_blank');
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-[#2962ff]" />
+                <span>Open TradingView Chart</span>
+              </button>
 
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                onSelectStockForDetails(stock);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
-            >
-              <Info className="w-3.5 h-3.5 text-[#089981]" />
-              <span>View Stock Details</span>
-            </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onSelectStockForDetails(stock);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
+              >
+                <Info className="w-3.5 h-3.5 text-[#089981]" />
+                <span>View Stock Details</span>
+              </button>
 
-            <div className="my-1 border-t border-[#2a2e39]" />
+              <div className="my-1 border-t border-[#2a2e39]" />
 
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                onMoveOpen(stock);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
-            >
-              <MoveRight className="w-3.5 h-3.5 text-[#2962ff]" />
-              <span>Move to Watchlist...</span>
-            </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onMoveOpen(stock);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
+              >
+                <MoveRight className="w-3.5 h-3.5 text-[#2962ff]" />
+                <span>Move to Watchlist...</span>
+              </button>
 
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                onCopyOpen(stock);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
-            >
-              <Copy className="w-3.5 h-3.5 text-[#089981]" />
-              <span>Copy to Watchlist...</span>
-            </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onCopyOpen(stock);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#d1d4dc] hover:bg-[#2a2e39]"
+              >
+                <Copy className="w-3.5 h-3.5 text-[#089981]" />
+                <span>Copy to Watchlist...</span>
+              </button>
 
-            <div className="my-1 border-t border-[#2a2e39]" />
+              <div className="my-1 border-t border-[#2a2e39]" />
 
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                onDeleteStock(stock);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#f23645] hover:bg-[#2a2e39]"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Remove from Watchlist</span>
-            </button>
-          </div>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDeleteStock(stock);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#f23645] hover:bg-[#2a2e39]"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove from Watchlist</span>
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

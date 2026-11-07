@@ -83,6 +83,31 @@ export function initializeDatabase() {
       UNIQUE(company_id, tag_id)
     );
   `);
+
+  // Ensure default watchlists exist if database has no watchlists
+  const wlCount = rawDb.prepare('SELECT COUNT(*) as c FROM watchlists').get() as { c: number };
+  if (wlCount.c === 0) {
+    const defaultWatchlists = [
+      { name: 'Leading', color: '#22c55e', sections: ['Strong Momentum', 'Near Breakout', 'Pullback Candidates', 'Extended'] },
+      { name: 'Mediocre', color: '#eab308', sections: ['Improving', 'Consolidating', 'Weak Momentum'] },
+      { name: 'Lagging', color: '#ef4444', sections: ['Declining', 'Breaking Down', 'Avoid'] },
+      { name: 'Breakout Candidates', color: '#3b82f6', sections: ['Ready', 'Triggered', 'Watching'] },
+      { name: 'Under Observation', color: '#8b5cf6', sections: ['High Relative Strength', 'Earnings Ahead'] },
+      { name: 'Potential Reversals', color: '#f97316', sections: ['Bottoming Base', 'Oversold RSI'] },
+    ];
+    const insertWl = rawDb.prepare('INSERT INTO watchlists (name, color, sort_order) VALUES (?, ?, ?)');
+    const insertSec = rawDb.prepare('INSERT INTO sections (watchlist_id, name, sort_order) VALUES (?, ?, ?)');
+    const txn = rawDb.transaction(() => {
+      defaultWatchlists.forEach((wl, idx) => {
+        const res = insertWl.run(wl.name, wl.color, idx);
+        const wId = res.lastInsertRowid as number;
+        wl.sections.forEach((sec, sIdx) => {
+          insertSec.run(wId, sec, sIdx);
+        });
+      });
+    });
+    txn();
+  }
 }
 
 // ─── Sectors & Subsectors ──────────────────────────────────────────────
@@ -451,7 +476,12 @@ export function updateWatchlist(id: number, data: { name?: string; color?: strin
 }
 
 export function deleteWatchlist(id: number) {
-  db.delete(watchlists).where(eq(watchlists.id, id)).run();
+  const txn = rawDb.transaction(() => {
+    rawDb.prepare('DELETE FROM watchlist_stocks WHERE watchlist_id = ?').run(id);
+    rawDb.prepare('DELETE FROM sections WHERE watchlist_id = ?').run(id);
+    rawDb.prepare('DELETE FROM watchlists WHERE id = ?').run(id);
+  });
+  txn();
 }
 
 export function duplicateWatchlist(id: number, newName: string) {
@@ -519,9 +549,12 @@ export function updateSection(id: number, data: { name?: string; sortOrder?: num
 }
 
 export function deleteSection(id: number) {
-  // Move stocks to uncategorized (null section)
-  db.update(watchlistStocks).set({ sectionId: null }).where(eq(watchlistStocks.sectionId, id)).run();
-  db.delete(sections).where(eq(sections.id, id)).run();
+  const txn = rawDb.transaction(() => {
+    // Move stocks to uncategorized (null section)
+    rawDb.prepare('UPDATE watchlist_stocks SET section_id = NULL WHERE section_id = ?').run(id);
+    rawDb.prepare('DELETE FROM sections WHERE id = ?').run(id);
+  });
+  txn();
 }
 
 export function reorderSections(watchlistId: number, orderedIds: number[]) {
@@ -597,13 +630,44 @@ export function addStockToWatchlist(watchlistId: number, exchangeListingId: numb
   return { success: true };
 }
 
-export function removeStockFromWatchlist(watchlistId: number, exchangeListingId: number) {
-  db.delete(watchlistStocks)
-    .where(and(
-      eq(watchlistStocks.watchlistId, watchlistId),
-      eq(watchlistStocks.exchangeListingId, exchangeListingId)
-    ))
-    .run();
+export function removeStockFromWatchlist(watchlistId: number, idOrListingId: number, isStockId = false) {
+  const txn = rawDb.transaction(() => {
+    if (isStockId) {
+      rawDb.prepare('DELETE FROM watchlist_stocks WHERE id = ?').run(idOrListingId);
+      return;
+    }
+
+    // Check if the id provided is directly a watchlist_stocks id
+    const byWsId = rawDb.prepare('SELECT id FROM watchlist_stocks WHERE id = ?').get(idOrListingId) as { id: number } | undefined;
+    if (byWsId) {
+      rawDb.prepare('DELETE FROM watchlist_stocks WHERE id = ?').run(idOrListingId);
+      return;
+    }
+
+    // Dual-listing resolution: find company and remove all exchange listings of this company from this watchlist
+    const listing = rawDb.prepare('SELECT company_id FROM exchange_listings WHERE id = ?').get(idOrListingId) as { company_id: number } | undefined;
+    if (listing && listing.company_id) {
+      rawDb.prepare(`
+        DELETE FROM watchlist_stocks 
+        WHERE watchlist_id = ? 
+          AND exchange_listing_id IN (SELECT id FROM exchange_listings WHERE company_id = ?)
+      `).run(watchlistId, listing.company_id);
+    } else {
+      rawDb.prepare('DELETE FROM watchlist_stocks WHERE watchlist_id = ? AND exchange_listing_id = ?').run(watchlistId, idOrListingId);
+    }
+  });
+  txn();
+}
+
+export function bulkDeleteStocks(stockIds: number[]) {
+  if (!stockIds || stockIds.length === 0) return { deleted: 0 };
+  const txn = rawDb.transaction(() => {
+    const placeholders = stockIds.map(() => '?').join(',');
+    const stmt = rawDb.prepare(`DELETE FROM watchlist_stocks WHERE id IN (${placeholders})`);
+    const res = stmt.run(...stockIds);
+    return { deleted: res.changes };
+  });
+  return txn();
 }
 
 export function moveStock(
@@ -976,16 +1040,17 @@ export function getStockStatusAndWatchlists(symbolOrListingId: string | number) 
   // Fetch all watchlists and sections
   const allWatchlists = getAllWatchlists();
 
-  // Fetch this listing's current memberships across all watchlists
+  // Fetch this listing's current memberships across all watchlists (matching by company_id for dual-listing unity)
   const memberships = rawDb.prepare(`
     SELECT 
       ws.watchlist_id,
       ws.section_id,
       sec.name as section_name
     FROM watchlist_stocks ws
+    JOIN exchange_listings el ON el.id = ws.exchange_listing_id
     LEFT JOIN sections sec ON sec.id = ws.section_id
-    WHERE ws.exchange_listing_id = ?
-  `).all(listingId) as Array<{
+    WHERE el.company_id = ?
+  `).all(listingData.company_id) as Array<{
     watchlist_id: number;
     section_id: number | null;
     section_name: string | null;
@@ -1033,10 +1098,20 @@ export function getStockStatusAndWatchlists(symbolOrListingId: string | number) 
 }
 
 export function assignStockToSection(watchlistId: number, exchangeListingId: number, sectionId: number | null) {
-  // If stock is not in watchlist, insert it. If already in watchlist, update sectionId.
-  const existing = rawDb.prepare(`
-    SELECT id FROM watchlist_stocks WHERE watchlist_id = ? AND exchange_listing_id = ?
-  `).get(watchlistId, exchangeListingId) as { id: number } | undefined;
+  const listing = rawDb.prepare('SELECT company_id FROM exchange_listings WHERE id = ?').get(exchangeListingId) as { company_id: number } | undefined;
+  
+  let existing: { id: number } | undefined;
+  if (listing && listing.company_id) {
+    existing = rawDb.prepare(`
+      SELECT ws.id FROM watchlist_stocks ws
+      JOIN exchange_listings el ON el.id = ws.exchange_listing_id
+      WHERE ws.watchlist_id = ? AND el.company_id = ?
+    `).get(watchlistId, listing.company_id) as { id: number } | undefined;
+  } else {
+    existing = rawDb.prepare(`
+      SELECT id FROM watchlist_stocks WHERE watchlist_id = ? AND exchange_listing_id = ?
+    `).get(watchlistId, exchangeListingId) as { id: number } | undefined;
+  }
 
   if (existing) {
     rawDb.prepare(`
@@ -1057,10 +1132,20 @@ export function assignStockToSection(watchlistId: number, exchangeListingId: num
 }
 
 export function removeStockFromAllWatchlists(exchangeListingId: number) {
-  const result = rawDb.prepare(`
-    DELETE FROM watchlist_stocks WHERE exchange_listing_id = ?
-  `).run(exchangeListingId);
-
-  return { success: true, removedCount: result.changes };
+  const listing = rawDb.prepare('SELECT company_id FROM exchange_listings WHERE id = ?').get(exchangeListingId) as { company_id: number } | undefined;
+  let changes = 0;
+  if (listing && listing.company_id) {
+    const res = rawDb.prepare(`
+      DELETE FROM watchlist_stocks 
+      WHERE exchange_listing_id IN (SELECT id FROM exchange_listings WHERE company_id = ?)
+    `).run(listing.company_id);
+    changes = res.changes;
+  } else {
+    const res = rawDb.prepare(`
+      DELETE FROM watchlist_stocks WHERE exchange_listing_id = ?
+    `).run(exchangeListingId);
+    changes = res.changes;
+  }
+  return { success: true, removedCount: changes };
 }
 

@@ -54,9 +54,26 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   ensureDb();
   const body = await req.json();
-  const { watchlistId, exchangeListingId } = body;
+  const watchlistId = body.watchlistId ? Number(body.watchlistId) : null;
+  const exchangeListingId = body.exchangeListingId ? Number(body.exchangeListingId) : null;
+  const stockId = body.stockId ? Number(body.stockId) : (body.id ? Number(body.id) : null);
+  const stockIds = Array.isArray(body.stockIds) ? body.stockIds.map(Number) : null;
+
+  // Bulk delete by stock IDs
+  if (stockIds && stockIds.length > 0) {
+    const result = ops.bulkDeleteStocks(stockIds);
+    return jsonResponse({ success: true, count: result.deleted });
+  }
+
+  // Single delete by stockId (primary key in watchlist_stocks)
+  if (stockId) {
+    ops.removeStockFromWatchlist(watchlistId || 0, stockId, true);
+    return jsonResponse({ success: true });
+  }
+
+  // Delete by watchlistId & exchangeListingId (with dual-listing company resolution)
   if (!watchlistId || !exchangeListingId) {
-    return errorResponse('watchlistId and exchangeListingId required');
+    return errorResponse('watchlistId and exchangeListingId (or stockId/stockIds) required');
   }
   ops.removeStockFromWatchlist(watchlistId, exchangeListingId);
   return jsonResponse({ success: true });

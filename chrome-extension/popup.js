@@ -447,6 +447,12 @@ function renderWatchlistsList() {
               </svg>
               <span>Added</span>
             </span>
+            <button class="row-remove-btn" data-action="remove-row" data-wl-id="${wl.id}" title="Remove from ${wl.name}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
             <span class="expand-chevron">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -549,10 +555,20 @@ function renderWatchlistsList() {
       });
     }
 
-    // Remove from watchlist button
+    // Direct row remove button
+    const rowRemoveBtn = card.querySelector('.row-remove-btn');
+    if (rowRemoveBtn) {
+      rowRemoveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleRemoveFromWatchlist(wl.id);
+      });
+    }
+
+    // Remove from watchlist button in drawer
     const btnRemoveWl = card.querySelector('.remove-from-wl-btn');
     if (btnRemoveWl) {
-      btnRemoveWl.addEventListener('click', () => {
+      btnRemoveWl.addEventListener('click', (e) => {
+        e.stopPropagation();
         handleRemoveFromWatchlist(wl.id);
       });
     }
@@ -673,10 +689,10 @@ async function handleRemoveFromWatchlist(watchlistId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'remove_watchlist',
-        watchlistId: watchlistId,
-        watchlist_id: watchlistId,
-        listingId: currentStock.id,
-        stock_id: currentStock.id
+        watchlistId: Number(watchlistId),
+        watchlist_id: Number(watchlistId),
+        listingId: Number(currentStock.id),
+        stock_id: Number(currentStock.id)
       })
     });
 

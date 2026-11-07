@@ -862,6 +862,24 @@
         gap: 3px;
       }
 
+      .so-btn-remove-row {
+        background: transparent;
+        border: 1px solid transparent;
+        color: #787b86;
+        padding: 2px 4px;
+        border-radius: 3px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+      .so-btn-remove-row:hover {
+        background: rgba(242, 54, 69, 0.15);
+        color: #f23645;
+        border-color: rgba(242, 54, 69, 0.3);
+      }
+
       .so-btn-quick-add {
         background: #2a2e39;
         border: 1px solid #363a45;
@@ -1024,17 +1042,23 @@
       }
 
       .so-remove-wl-btn {
-        background: none;
-        border: none;
+        background: rgba(242, 54, 69, 0.1);
+        border: 1px solid rgba(242, 54, 69, 0.25);
         color: #f23645;
-        font-size: 9.5px;
+        font-size: 10px;
+        font-weight: 500;
         cursor: pointer;
-        margin-top: 6px;
+        margin-top: 8px;
         display: block;
-        margin-left: auto;
+        width: 100%;
+        padding: 5px 8px;
+        border-radius: 4px;
+        text-align: center;
+        transition: all 0.15s;
       }
       .so-remove-wl-btn:hover {
-        text-decoration: underline;
+        background: rgba(242, 54, 69, 0.2);
+        border-color: rgba(242, 54, 69, 0.5);
       }
 
       /* Footer */
@@ -1808,6 +1832,12 @@
                 </svg>
                 <span>Added</span>
               </span>
+              <button class="so-btn-remove-row" data-action="remove-row" data-wl-id="${wl.id}" title="Remove from ${wl.name}">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
               <span class="so-chevron">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="6 9 12 15 18 9"></polyline>
@@ -1902,10 +1932,20 @@
         });
       }
 
+      // Direct Row Remove Button Click
+      const btnRemoveRow = card.querySelector('.so-btn-remove-row');
+      if (btnRemoveRow) {
+        btnRemoveRow.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeFromWatchlist(wl.id);
+        });
+      }
+
       // Remove from Watchlist Button
       const btnRemoveWl = card.querySelector('.so-remove-wl-btn');
       if (btnRemoveWl) {
-        btnRemoveWl.addEventListener('click', () => {
+        btnRemoveWl.addEventListener('click', (e) => {
+          e.stopPropagation();
           removeFromWatchlist(wl.id);
         });
       }
@@ -2030,10 +2070,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'remove_watchlist',
-          watchlistId: watchlistId,
-          watchlist_id: watchlistId,
-          listingId: currentStock.id,
-          stock_id: currentStock.id
+          watchlistId: Number(watchlistId),
+          watchlist_id: Number(watchlistId),
+          listingId: Number(currentStock.id),
+          stock_id: Number(currentStock.id)
         })
       });
 
